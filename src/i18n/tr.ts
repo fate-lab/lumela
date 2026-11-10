@@ -19,7 +19,7 @@ export const tr: Dict = {
     copy: "Kopyala",
     save: "Kaydet",
     saveAs: "Farklı kaydet",
-    drag: "⠿ Sürükle",
+    drag: "Sürükle",
     dragHint: "Basılı tutup başka bir uygulamaya sürükleyin",
   },
   tools: {

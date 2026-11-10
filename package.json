@@ -21,6 +21,7 @@
     "@tauri-apps/plugin-process": "^2.4.0",
     "@tauri-apps/plugin-updater": "^2.14.1",
     "konva": "^10.9.1",
+    "lucide-react": "^1.71.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zustand": "^5.1.0"

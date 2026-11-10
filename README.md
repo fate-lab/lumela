@@ -27,7 +27,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/editor-dark.png" alt="Lumela editor with an arrow, a highlight and automatically redacted email, card number, IP address and API key" width="900">
+  <img src="docs/demo.gif" alt="Lumela beautifying a screenshot, redacting an email, card number, IP address and API key in one click, adding an arrow and text, then copying the result" width="900">
 </p>
 
 ## Why Lumela?
@@ -48,12 +48,25 @@ Get the installer for your system from the [latest release](https://github.com/t
 | macOS 10.15+ (Apple silicon and Intel) | `Lumela_<version>_universal.dmg` |
 | Linux (x64): Ubuntu 24.04+, Debian 13+, Fedora 40+ or similar | `Lumela_<version>_amd64.AppImage` or `.deb` |
 
+Or install it with a package manager:
+
+```bash
+brew install --cask tw4/tap/lumela                                                   # macOS (Homebrew)
+scoop install https://raw.githubusercontent.com/tw4/lumela/main/packaging/scoop/lumela.json   # Windows (Scoop)
+winget install tw4.Lumela                                                            # Windows (winget)
+yay -S lumela-bin                                                                    # Arch Linux (AUR)
+```
+
 Lumela updates itself, and every update is signature-checked before it is installed.
 
 > [!NOTE]
-> Installers are not code-signed yet, so the operating system may warn on first launch.
-> **Windows:** *More info* → *Run anyway*. **macOS:** right-click the app → *Open*.
-> On Linux, install `tesseract-ocr` for text recognition.
+> Installers are not code-signed yet, so the operating system warns on first launch.
+>
+> **Windows:** *More info* → *Run anyway*.
+>
+> **macOS 15 and later:** open Lumela once and close the warning, then go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to the Lumela message. On macOS 14 and earlier, right-click the app → *Open* is enough. Installing with Homebrew skips this step.
+>
+> **Linux:** the `.deb` installs `tesseract-ocr` for text recognition. With the AppImage, install it yourself (`sudo apt install tesseract-ocr`, `sudo dnf install tesseract` or `sudo pacman -S tesseract tesseract-data-eng`).
 
 ## Features
 

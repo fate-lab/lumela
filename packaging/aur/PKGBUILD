@@ -1,0 +1,17 @@
+# Maintainer: tw4 <https://github.com/tw4>
+pkgname=lumela-bin
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Screenshot tool: capture, beautify, annotate, redact and copy text"
+arch=('x86_64')
+url="https://github.com/tw4/lumela"
+license=('GPL-3.0-or-later')
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'pipewire' 'tesseract' 'tesseract-data-eng')
+provides=('lumela')
+conflicts=('lumela')
+source=("https://github.com/tw4/lumela/releases/download/v${pkgver}/Lumela_${pkgver}_amd64.deb")
+sha256sums=('bd573126aad19676b096c0a2ff0fc32a1b2638489503a847e2b82b286f29e22d')
+
+package() {
+  bsdtar -xf data.tar.gz -C "$pkgdir"
+}

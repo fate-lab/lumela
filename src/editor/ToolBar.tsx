@@ -1,16 +1,17 @@
+import { BringToFront, EyeOff, MousePointer2, MoveUpRight, Redo2, ScanText, SendToBack, Shapes, Sparkles, Trash2, Type, Undo2, type LucideIcon } from "lucide-react";
 import type { Annotation, ArrowStyle, RedactMode, ShapeKind } from "../lib/annotations";
 import { PALETTE, ToolStyle, useStore } from "../lib/store";
 import type { Tool } from "./AnnotationLayer";
 import { useT } from "../i18n";
 import type { Dict } from "../i18n/en";
 
-const TOOLS: { id: Tool; label: (t: Dict) => string; key: string }[] = [
-  { id: "select", label: (t) => t.tools.select, key: "V" },
-  { id: "arrow", label: (t) => t.tools.arrow, key: "1" },
-  { id: "text", label: (t) => t.tools.text, key: "2" },
-  { id: "redact", label: (t) => t.tools.redact, key: "3" },
-  { id: "shape", label: (t) => t.tools.shape, key: "4" },
-  { id: "ocr", label: (t) => t.tools.ocr, key: "T" },
+const TOOLS: { id: Tool; label: (t: Dict) => string; key: string; Icon: LucideIcon }[] = [
+  { id: "select", label: (t) => t.tools.select, key: "V", Icon: MousePointer2 },
+  { id: "arrow", label: (t) => t.tools.arrow, key: "1", Icon: MoveUpRight },
+  { id: "text", label: (t) => t.tools.text, key: "2", Icon: Type },
+  { id: "redact", label: (t) => t.tools.redact, key: "3", Icon: EyeOff },
+  { id: "shape", label: (t) => t.tools.shape, key: "4", Icon: Shapes },
+  { id: "ocr", label: (t) => t.tools.ocr, key: "T", Icon: ScanText },
 ];
 
 interface Props {
@@ -82,18 +83,19 @@ export default function ToolBar(p: Props) {
             key={tool.id} disabled={p.disabled} className={p.tool === tool.id ? "active" : ""}
             onClick={() => p.setTool(tool.id)} title={`${tool.label(t)} (${tool.key})`}
           >
-            {tool.label(t)}<kbd>{tool.key}</kbd>
+            <tool.Icon size={15} aria-hidden />{tool.label(t)}<kbd>{tool.key}</kbd>
           </button>
         ))}
         <span className="sep" />
-        <button disabled={!p.canUndo} onClick={p.onUndo} title={t.tools.undo}>↶</button>
-        <button disabled={!p.canRedo} onClick={p.onRedo} title={t.tools.redo}>↷</button>
+        <button disabled={!p.canUndo} onClick={p.onUndo} title={t.tools.undo} aria-label={t.tools.undo}><Undo2 size={15} /></button>
+        <button disabled={!p.canRedo} onClick={p.onRedo} title={t.tools.redo} aria-label={t.tools.redo}><Redo2 size={15} /></button>
         <span className="sep" />
-        <button disabled={!p.selection.length} onClick={() => p.onOrder(true)} title={t.tools.frontHint}>{t.tools.front}</button>
-        <button disabled={!p.selection.length} onClick={() => p.onOrder(false)} title={t.tools.backHint}>{t.tools.back}</button>
-        <button disabled={!p.selection.length} onClick={p.onDelete} title={t.tools.deleteHint}>{t.tools.delete}</button>
+        <button disabled={!p.selection.length} onClick={() => p.onOrder(true)} title={t.tools.frontHint}><BringToFront size={15} aria-hidden />{t.tools.front}</button>
+        <button disabled={!p.selection.length} onClick={() => p.onOrder(false)} title={t.tools.backHint}><SendToBack size={15} aria-hidden />{t.tools.back}</button>
+        <button disabled={!p.selection.length} onClick={p.onDelete} title={t.tools.deleteHint}><Trash2 size={15} aria-hidden />{t.tools.delete}</button>
         <span className="sep" />
         <button disabled={p.disabled || p.autoRedactBusy} onClick={p.onAutoRedact} title={t.tools.autoRedactHint}>
+          <Sparkles size={15} aria-hidden />
           {p.autoRedactBusy ? t.tools.autoRedactBusy : t.tools.autoRedact}
         </button>
       </div>

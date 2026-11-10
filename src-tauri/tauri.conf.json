@@ -50,7 +50,21 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": true,
+    "linux": {
+      "deb": {
+        "depends": [
+          "tesseract-ocr",
+          "tesseract-ocr-eng"
+        ]
+      },
+      "rpm": {
+        "depends": [
+          "tesseract",
+          "tesseract-langpack-eng"
+        ]
+      }
+    }
   },
   "plugins": {
     "updater": {

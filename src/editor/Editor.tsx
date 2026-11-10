@@ -1,3 +1,4 @@
+import { AppWindow, ClipboardPaste, Copy, FolderOpen, GripVertical, History, Monitor, Save, SaveAll, Settings, SquareDashed } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -408,25 +409,25 @@ export default function Editor() {
     <div className="app">
       <header className="toolbar">
         <div className="group">
-          <button onClick={() => capture("area")} title="Ctrl+Shift+2">{t.toolbar.area}</button>
-          <button onClick={() => capture("window")} title="Ctrl+Shift+3">{t.toolbar.window}</button>
-          <button onClick={() => capture("fullscreen")} title="Ctrl+Shift+1">{t.toolbar.fullscreen}</button>
+          <button onClick={() => capture("area")} title="Ctrl+Shift+2"><SquareDashed size={15} aria-hidden />{t.toolbar.area}</button>
+          <button onClick={() => capture("window")} title="Ctrl+Shift+3"><AppWindow size={15} aria-hidden />{t.toolbar.window}</button>
+          <button onClick={() => capture("fullscreen")} title="Ctrl+Shift+1"><Monitor size={15} aria-hidden />{t.toolbar.fullscreen}</button>
           <span className="sep" />
-          <button onClick={openFile} title="Ctrl+O">{t.toolbar.open}</button>
-          <button onClick={paste} title="Ctrl+V">{t.toolbar.paste}</button>
+          <button onClick={openFile} title="Ctrl+O"><FolderOpen size={15} aria-hidden />{t.toolbar.open}</button>
+          <button onClick={paste} title="Ctrl+V"><ClipboardPaste size={15} aria-hidden />{t.toolbar.paste}</button>
           <span className="sep" />
-          <button onClick={() => setShowHistory(true)} title={t.toolbar.history}>{t.toolbar.history}</button>
-          <button onClick={() => openSettings().catch((e) => notify(String(e), true))} title={t.toolbar.settings}>{t.toolbar.settings}</button>
+          <button onClick={() => setShowHistory(true)} title={t.toolbar.history}><History size={15} aria-hidden />{t.toolbar.history}</button>
+          <button onClick={() => openSettings().catch((e) => notify(String(e), true))} title={t.toolbar.settings}><Settings size={15} aria-hidden />{t.toolbar.settings}</button>
         </div>
         <div className="group">
           {source && view && <span className="dim">{view.layout.width} × {view.layout.height}</span>}
-          <button className="primary" disabled={!source || busy} onClick={copy} title="Ctrl+C">{t.toolbar.copy}</button>
-          <button disabled={!source || busy} onClick={quickSave} title="Ctrl+S">{t.toolbar.save}</button>
-          <button disabled={!source || busy} onClick={saveAs} title="Ctrl+Shift+S">{t.toolbar.saveAs}</button>
+          <button className="primary" disabled={!source || busy} onClick={copy} title="Ctrl+C"><Copy size={15} aria-hidden />{t.toolbar.copy}</button>
+          <button disabled={!source || busy} onClick={quickSave} title="Ctrl+S"><Save size={15} aria-hidden />{t.toolbar.save}</button>
+          <button disabled={!source || busy} onClick={saveAs} title="Ctrl+Shift+S"><SaveAll size={15} aria-hidden />{t.toolbar.saveAs}</button>
           <button
             className="drag-out" disabled={!source || busy} onMouseDown={(e) => { if (e.button === 0) dragOut(); }}
             title={t.toolbar.dragHint}
-          >{t.toolbar.drag}</button>
+          ><GripVertical size={15} aria-hidden />{t.toolbar.drag}</button>
         </div>
       </header>
       <ToolBar

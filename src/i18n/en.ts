@@ -18,7 +18,7 @@ export const en = {
     copy: "Copy",
     save: "Save",
     saveAs: "Save as",
-    drag: "⠿ Drag",
+    drag: "Drag",
     dragHint: "Press and drag into another app",
   },
   tools: {

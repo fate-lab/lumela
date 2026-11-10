@@ -8,7 +8,7 @@
   --accent: #db2777;
   --accent-text: #ffffff;
   --input: #f6f7f9;
-  font-family: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI Variable", "Segoe UI", sans-serif;
   font-size: 13px;
   color: var(--text);
   background: var(--bg);
@@ -53,7 +53,11 @@ html[data-view="overlay"], html[data-view="overlay"] body { background: transpar
 button {
   font: inherit; color: var(--text); background: var(--input); border: 1px solid var(--border);
   border-radius: 7px; padding: 6px 12px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
+button svg { flex-shrink: 0; }
+button:not(.primary) svg { color: var(--muted); }
+button:hover:not(:disabled) svg, button.active svg { color: var(--accent); }
 button:hover:not(:disabled) { border-color: var(--accent); }
 button:disabled { opacity: 0.45; cursor: default; }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
