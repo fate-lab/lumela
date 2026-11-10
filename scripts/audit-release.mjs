@@ -22,6 +22,13 @@ const RULES = [
 
 const SKIP_EXT = /\.(png|jpe?g|gif|ico|icns|woff2?|ttf)$/i;
 
+// Third-party system libraries bundled into the AppImage (GTK, GnuTLS, libssh, WebKit…)
+// contain PEM headers and their builders' paths as constants; they are not our code.
+const THIRD_PARTY = /[\\/]usr[\\/]lib[\\/]/;
+// Compressed installers/archives: their bytes are not searchable, and the Lumela binary
+// inside each of them is audited on its own.
+const CONTAINER = /\.(AppImage|dmg|deb|rpm|msi|zip|tar\.gz)$|-setup\.exe$/i;
+
 function* walk(p) {
   const s = statSync(p);
   if (s.isDirectory()) for (const e of readdirSync(p)) yield* walk(join(p, e));
@@ -38,7 +45,7 @@ const hits = [];
 let scanned = 0;
 for (const t of targets) {
   for (const file of walk(t)) {
-    if (SKIP_EXT.test(file)) continue;
+    if (SKIP_EXT.test(file) || THIRD_PARTY.test(file) || CONTAINER.test(file)) continue;
     if (file.endsWith(".map")) { hits.push(`${file}: source map file`); continue; }
     // latin1 keeps every byte, so binaries can be searched as text.
     const text = readFileSync(file).toString("latin1");
