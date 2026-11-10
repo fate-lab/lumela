@@ -54,7 +54,6 @@ Or install it with a package manager:
 brew trust tw4/tap && brew install --cask tw4/tap/lumela                             # macOS (Homebrew)
 scoop install https://raw.githubusercontent.com/tw4/lumela/main/packaging/scoop/lumela.json   # Windows (Scoop)
 winget install tw4.Lumela                                                            # Windows (winget)
-yay -S lumela-bin                                                                    # Arch Linux (AUR)
 ```
 
 Lumela updates itself, and every update is signature-checked before it is installed.
