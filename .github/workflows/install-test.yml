@@ -9,6 +9,9 @@ on:
       tag:
         description: Release tag (empty = latest)
         required: false
+      only:
+        description: "Run only one platform: windows, macos or linux (empty = all)"
+        required: false
 
 permissions:
   contents: read
@@ -18,6 +21,7 @@ env:
 
 jobs:
   windows:
+    if: inputs.only == '' || inputs.only == 'windows'
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -49,8 +53,10 @@ jobs:
           $dir = "packaging/winget/${{ steps.tag.outputs.version }}"
           if (-not (Test-Path $dir)) { throw "no winget manifest for this version in $dir" }
           winget --version
-          winget validate --manifest $dir
-          if ($LASTEXITCODE -ne 0) { throw "winget validate failed" }
+          $out = winget validate --manifest $dir | Out-String
+          Write-Host $out
+          # Older winget on the runner reports newer schema headers as warnings (non-zero exit).
+          if ($out -notmatch "validation succeeded") { throw "winget validate failed" }
           winget settings --enable LocalManifestFiles
           winget install --manifest $dir --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
           if ($LASTEXITCODE -ne 0) { throw "winget install failed ($LASTEXITCODE)" }
@@ -89,6 +95,7 @@ jobs:
           if-no-files-found: ignore
 
   macos:
+    if: inputs.only == '' || inputs.only == 'macos'
     runs-on: macos-latest
     strategy:
       fail-fast: false
@@ -142,6 +149,7 @@ jobs:
           if-no-files-found: ignore
 
   linux:
+    if: inputs.only == '' || inputs.only == 'linux'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
