@@ -1,15 +1,58 @@
 name: CI
 
+# Only code changes run CI. Docs, screenshots and package manifests don't.
+# The three-OS Rust job runs only when the Rust side (or what it embeds) changes.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "branding/**"
+      - "packaging/**"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/release-notes/**"
+      - ".github/workflows/packages.yml"
+      - ".github/workflows/release.yml"
+      - "scripts/docs-*.mjs"
+      - "scripts/update-packages.mjs"
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "branding/**"
+      - "packaging/**"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/release-notes/**"
+      - ".github/workflows/packages.yml"
+      - ".github/workflows/release.yml"
+      - "scripts/docs-*.mjs"
+      - "scripts/update-packages.mjs"
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: read
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            rust:
+              - "src-tauri/**"
+              - "package.json"
+              - "package-lock.json"
+              - ".github/workflows/ci.yml"
+
   frontend:
     runs-on: ubuntu-24.04
     steps:
@@ -37,6 +80,8 @@ jobs:
           if-no-files-found: ignore
 
   rust:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:

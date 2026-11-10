@@ -1,0 +1,87 @@
+name: Packages
+
+# After a release is published: point the Homebrew cask (tw4/homebrew-tap) and the Scoop
+# manifest at it, and open a winget-pkgs pull request for the new version.
+# Secrets: HOMEBREW_TAP_DEPLOY_KEY (write deploy key of tw4/homebrew-tap),
+#          WINGET_TOKEN (classic PAT with public_repo, used to open the winget-pkgs PR).
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, e.g. v0.2.0
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packages
+  cancel-in-progress: false
+
+jobs:
+  homebrew-scoop:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Checksums
+        id: sums
+        run: |
+          v="${TAG#v}"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dl \
+            --pattern "Lumela_${v}_universal.dmg" --pattern "Lumela_${v}_x64-setup.exe"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "dmg=$(sha256sum "dl/Lumela_${v}_universal.dmg" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "exe=$(sha256sum "dl/Lumela_${v}_x64-setup.exe" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Update manifests
+        run: node scripts/update-packages.mjs "${{ steps.sums.outputs.version }}" "${{ steps.sums.outputs.dmg }}" "${{ steps.sums.outputs.exe }}"
+      - name: Commit to this repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packaging
+          git diff --cached --quiet || { git commit -m "Packages: ${TAG}"; git push origin HEAD:main; }
+      - name: Push the cask to tw4/homebrew-tap
+        env:
+          DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+        run: |
+          if [ -z "$DEPLOY_KEY" ]; then echo "::warning::HOMEBREW_TAP_DEPLOY_KEY not set, skipping the tap"; exit 0; fi
+          install -m 600 /dev/null ~/tap_key && printf '%s\n' "$DEPLOY_KEY" > ~/tap_key
+          export GIT_SSH_COMMAND="ssh -i ~/tap_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          git clone --depth 1 git@github.com:tw4/homebrew-tap.git tap
+          cp packaging/homebrew/lumela.rb tap/Casks/lumela.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/lumela.rb
+          git diff --cached --quiet || { git commit -m "lumela ${TAG#v}"; git push origin HEAD:main; }
+
+  winget:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Check token
+        id: token
+        shell: bash
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          if [ -z "$WINGET_TOKEN" ]; then echo "::warning::WINGET_TOKEN not set, skipping winget"; echo "ok=false" >> "$GITHUB_OUTPUT"
+          else echo "ok=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: vedantmgoyal9/winget-releaser@v2
+        if: steps.token.outputs.ok == 'true'
+        with:
+          identifier: tw4.Lumela
+          release-tag: ${{ env.TAG }}
+          installers-regex: '_x64-setup\.exe$'
+          token: ${{ secrets.WINGET_TOKEN }}
+          fork-user: tw4
