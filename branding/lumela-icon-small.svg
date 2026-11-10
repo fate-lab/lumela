@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Small-size variant (tray, 16–32 px): no outer margin, bolder glyph, no fine details. -->
+  <defs>
+    <radialGradient id="b" cx="34%" cy="26%" r="90%">
+      <stop offset="0" stop-color="#ffe6f2"/>
+      <stop offset="0.22" stop-color="#ffb3d9"/>
+      <stop offset="0.55" stop-color="#f472b6"/>
+      <stop offset="1" stop-color="#b52a73"/>
+    </radialGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#b)"/>
+  <g fill="none" stroke="#2a0717" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 23v-5q0-4 4-4h5"/>
+    <path d="M41 14h5q4 0 4 4v5"/>
+    <path d="M50 41v5q0 4-4 4h-5"/>
+    <path d="M23 50h-5q-4 0-4-4v-5"/>
+  </g>
+  <path fill="#2a0717" d="M32 22c1 6 3.6 8.6 9.6 9.6c-6 1-8.6 3.6-9.6 9.6c-1-6-3.6-8.6-9.6-9.6c6-1 8.6-3.6 9.6-9.6z"/>
+</svg>

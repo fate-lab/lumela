@@ -1,0 +1,92 @@
+name: Release
+
+# Push a tag like v0.2.0. Every platform is built, signed and audited first; only if
+# all of them pass are the installers, updater signatures and latest.json published
+# as a DRAFT release of this repository (review it, then press Publish).
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: windows-latest
+            args: ""
+            bundle: src-tauri/target/release/bundle
+            binary: src-tauri/target/release/lumela.exe
+          - os: macos-latest
+            args: "--target universal-apple-darwin"
+            bundle: src-tauri/target/universal-apple-darwin/release/bundle
+            binary: src-tauri/target/universal-apple-darwin/release/lumela
+          - os: ubuntu-22.04
+            args: ""
+            bundle: src-tauri/target/release/bundle
+            binary: src-tauri/target/release/lumela
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev \
+            libssl-dev patchelf libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev libgbm-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check tag matches app version
+        shell: bash
+        run: |
+          v=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          test "v$v" = "${GITHUB_REF_NAME}" || { echo "tag ${GITHUB_REF_NAME} != version v$v"; exit 1; }
+      - name: Build and sign
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: npx tauri build ${{ matrix.args }}
+      - name: Leak audit (bundle, frontend, binary)
+        shell: bash
+        run: node scripts/audit-release.mjs dist "${{ matrix.bundle }}" "${{ matrix.binary }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ runner.os }}
+          path: ${{ matrix.bundle }}
+          retention-days: 3
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Select files and write latest.json
+        run: node scripts/latest-json.mjs artifacts "${GITHUB_REF_NAME}" out
+      - name: Audit exactly what is published
+        run: node scripts/audit-release.mjs out
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" out/* \
+            --repo "${GITHUB_REPOSITORY}" --draft --generate-notes \
+            --title "Lumela ${GITHUB_REF_NAME}"
