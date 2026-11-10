@@ -68,6 +68,7 @@ jobs:
           if ((Get-FileHash setup.exe -Algorithm SHA256).Hash -ne $sha) { throw "InstallerSha256 does not match $url" }
           $p = Start-Process .\setup.exe -ArgumentList "/S" -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "installer exit code $($p.ExitCode)" }
+          $global:LASTEXITCODE = 0  # winget validate's warning exit code must not fail the step
 
       - name: Install (Scoop, manifest from this repository)
         if: matrix.method == 'scoop'
