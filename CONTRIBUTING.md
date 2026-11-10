@@ -55,6 +55,7 @@ Guidelines:
 
 ## Releasing (maintainers)
 
-Bump `version` in `src-tauri/tauri.conf.json` and `package.json`, then push a tag `vX.Y.Z`.
+Bump `version` in `src-tauri/tauri.conf.json` and `package.json`, write the release notes in
+`.github/release-notes/vX.Y.Z.md` (optional; GitHub generates notes otherwise), then push a tag `vX.Y.Z`.
 The release workflow builds, signs and audits installers for all platforms and creates a
 draft release; review it and press **Publish**.

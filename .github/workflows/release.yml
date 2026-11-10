@@ -86,7 +86,10 @@ jobs:
       - name: Create draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Hand-written notes in .github/release-notes/<tag>.md win; otherwise GitHub generates them.
         run: |
+          notes=".github/release-notes/${GITHUB_REF_NAME}.md"
+          if [ -f "$notes" ]; then set -- --notes-file "$notes"; else set -- --generate-notes; fi
           gh release create "${GITHUB_REF_NAME}" out/* \
-            --repo "${GITHUB_REPOSITORY}" --draft --generate-notes \
+            --repo "${GITHUB_REPOSITORY}" --draft "$@" \
             --title "Lumela ${GITHUB_REF_NAME}"
