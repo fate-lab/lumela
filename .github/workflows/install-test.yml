@@ -1,0 +1,197 @@
+name: Install test
+
+# Installs a published release on fresh Windows, macOS and Linux runners the way users do
+# (installer, winget, Scoop, Homebrew, .deb, AppImage), launches it and keeps a desktop
+# screenshot of each as an artifact. Manual only.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (empty = latest)
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        method: [installer, winget, scoop]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve tag
+        id: tag
+        shell: bash
+        run: |
+          t="${{ inputs.tag }}"
+          [ -n "$t" ] || t=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          echo "tag=$t" >> "$GITHUB_OUTPUT"; echo "version=${t#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Install (NSIS installer, silent)
+        if: matrix.method == 'installer'
+        shell: pwsh
+        run: |
+          $v = "${{ steps.tag.outputs.version }}"
+          gh release download "${{ steps.tag.outputs.tag }}" --repo $env:GITHUB_REPOSITORY --pattern "Lumela_${v}_x64-setup.exe" --dir dl
+          $p = Start-Process "dl\Lumela_${v}_x64-setup.exe" -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exit code $($p.ExitCode)" }
+
+      - name: Install (winget, local manifest)
+        if: matrix.method == 'winget'
+        shell: pwsh
+        run: |
+          $dir = "packaging/winget/${{ steps.tag.outputs.version }}"
+          if (-not (Test-Path $dir)) { throw "no winget manifest for this version in $dir" }
+          winget --version
+          winget validate --manifest $dir
+          if ($LASTEXITCODE -ne 0) { throw "winget validate failed" }
+          winget settings --enable LocalManifestFiles
+          winget install --manifest $dir --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
+          if ($LASTEXITCODE -ne 0) { throw "winget install failed ($LASTEXITCODE)" }
+
+      - name: Install (Scoop, manifest from this repository)
+        if: matrix.method == 'scoop'
+        shell: pwsh
+        run: |
+          iex "& {$(irm get.scoop.sh)} -RunAsAdmin"
+          $env:PATH = "$env:USERPROFILE\scoop\shims;$env:PATH"
+          scoop install https://raw.githubusercontent.com/$env:GITHUB_REPOSITORY/main/packaging/scoop/lumela.json
+          if ($LASTEXITCODE -ne 0) { throw "scoop install failed" }
+          scoop list
+
+      - name: Launch and screenshot
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path "$env:LOCALAPPDATA","$env:ProgramFiles","$env:USERPROFILE\scoop" -Recurse -Filter lumela.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { throw "lumela.exe not found after install" }
+          Write-Host "Found $($exe.FullName)"
+          Start-Process $exe.FullName
+          Start-Sleep 15
+          if (-not (Get-Process lumela -ErrorAction SilentlyContinue)) { throw "Lumela is not running 15 s after launch" }
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
+          New-Item -ItemType Directory -Force shots | Out-Null
+          $bmp.Save("shots\windows-${{ matrix.method }}.png")
+          Write-Host "Lumela is running"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-${{ matrix.method }}
+          path: shots
+          if-no-files-found: ignore
+
+  macos:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        method: [dmg, homebrew]
+    steps:
+      - name: Resolve tag
+        id: tag
+        run: |
+          t="${{ inputs.tag }}"
+          [ -n "$t" ] || t=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          echo "tag=$t" >> "$GITHUB_OUTPUT"; echo "version=${t#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Install (DMG, as a browser download would)
+        if: matrix.method == 'dmg'
+        run: |
+          v="${{ steps.tag.outputs.version }}"
+          gh release download "${{ steps.tag.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --pattern "Lumela_${v}_universal.dmg" --dir dl
+          # Mark it as downloaded from the internet so Gatekeeper treats it like a real download.
+          xattr -w com.apple.quarantine "0081;$(printf %x $(date +%s));Safari;" "dl/Lumela_${v}_universal.dmg"
+          hdiutil attach -nobrowse -mountpoint /Volumes/Lumela "dl/Lumela_${v}_universal.dmg"
+          cp -R /Volumes/Lumela/Lumela.app /Applications/
+          hdiutil detach /Volumes/Lumela
+          echo "--- Gatekeeper verdict (expected: rejected until the app is notarized)"
+          spctl --assess --type execute -vv /Applications/Lumela.app || true
+          xattr -l /Applications/Lumela.app | head -5
+          # What "Open Anyway" does for the user:
+          xattr -dr com.apple.quarantine /Applications/Lumela.app
+
+      - name: Install (Homebrew cask)
+        if: matrix.method == 'homebrew'
+        run: |
+          brew trust tw4/tap || true
+          brew install --cask tw4/tap/lumela
+          echo "--- quarantine attribute after install (expected: none)"
+          xattr -l /Applications/Lumela.app | grep -c quarantine || true
+
+      - name: Launch and screenshot
+        run: |
+          codesign -dv /Applications/Lumela.app 2>&1 | head -5 || true
+          open /Applications/Lumela.app
+          sleep 15
+          pgrep -x lumela >/dev/null || pgrep -f Lumela.app/Contents/MacOS >/dev/null || { echo "Lumela is not running 15 s after launch"; exit 1; }
+          mkdir -p shots && screencapture -x "shots/macos-${{ matrix.method }}.png" || true
+          echo "Lumela is running"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-${{ matrix.method }}
+          path: shots
+          if-no-files-found: ignore
+
+  linux:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        method: [deb, appimage]
+    steps:
+      - name: Resolve tag
+        id: tag
+        run: |
+          t="${{ inputs.tag }}"
+          [ -n "$t" ] || t=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          echo "tag=$t" >> "$GITHUB_OUTPUT"; echo "version=${t#v}" >> "$GITHUB_OUTPUT"
+      - name: Desktop session (Xvfb)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb x11-apps imagemagick dbus-x11 at-spi2-core
+      - name: Install (.deb with apt)
+        if: matrix.method == 'deb'
+        run: |
+          v="${{ steps.tag.outputs.version }}"
+          gh release download "${{ steps.tag.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --pattern "Lumela_${v}_amd64.deb" --dir dl
+          sudo apt-get install -y "./dl/Lumela_${v}_amd64.deb"
+          echo "--- tesseract pulled in by the package?"
+          command -v tesseract && tesseract --version | head -1 || echo "tesseract NOT installed"
+          echo "BIN=/usr/bin/lumela" >> "$GITHUB_ENV"
+      - name: Install (AppImage)
+        if: matrix.method == 'appimage'
+        run: |
+          v="${{ steps.tag.outputs.version }}"
+          sudo apt-get install -y libfuse2t64
+          gh release download "${{ steps.tag.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --pattern "Lumela_${v}_amd64.AppImage" --dir dl
+          chmod +x "dl/Lumela_${v}_amd64.AppImage"
+          echo "BIN=$PWD/dl/Lumela_${v}_amd64.AppImage" >> "$GITHUB_ENV"
+      - name: Launch and screenshot
+        run: |
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1600x1000x24 & sleep 2
+          dbus-launch --exit-with-session "$BIN" > app.log 2>&1 &
+          sleep 15
+          mkdir -p shots && import -window root "shots/linux-${{ matrix.method }}.png" || true
+          if ! pgrep -f "$(basename "$BIN")" >/dev/null && ! pgrep -x lumela >/dev/null; then
+            echo "Lumela is not running 15 s after launch"; cat app.log; exit 1
+          fi
+          tail -20 app.log || true
+          echo "Lumela is running"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-${{ matrix.method }}
+          path: |
+            shots
+            app.log
+          if-no-files-found: ignore

@@ -14,6 +14,7 @@ on:
       - ".github/release-notes/**"
       - ".github/workflows/packages.yml"
       - ".github/workflows/release.yml"
+      - ".github/workflows/install-test.yml"
       - "scripts/docs-*.mjs"
       - "scripts/update-packages.mjs"
   pull_request:
@@ -26,6 +27,7 @@ on:
       - ".github/release-notes/**"
       - ".github/workflows/packages.yml"
       - ".github/workflows/release.yml"
+      - ".github/workflows/install-test.yml"
       - "scripts/docs-*.mjs"
       - "scripts/update-packages.mjs"
   workflow_dispatch:
