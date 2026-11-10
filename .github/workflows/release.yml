@@ -13,7 +13,7 @@ permissions:
 jobs:
   build:
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
@@ -24,7 +24,7 @@ jobs:
             args: "--target universal-apple-darwin"
             bundle: src-tauri/target/universal-apple-darwin/release/bundle
             binary: src-tauri/target/universal-apple-darwin/release/lumela
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             args: ""
             bundle: src-tauri/target/release/bundle
             binary: src-tauri/target/release/lumela

@@ -46,7 +46,7 @@ Get the installer for your system from the [latest release](https://github.com/t
 |---|---|
 | Windows 10 / 11 (x64) | `Lumela_<version>_x64-setup.exe` or `.msi` |
 | macOS 10.15+ (Apple silicon and Intel) | `Lumela_<version>_universal.dmg` |
-| Linux (x64) | `Lumela_<version>_amd64.AppImage` or `.deb` |
+| Linux (x64): Ubuntu 24.04+, Debian 13+, Fedora 40+ or similar | `Lumela_<version>_amd64.AppImage` or `.deb` |
 
 Lumela updates itself, and every update is signature-checked before it is installed.
 
