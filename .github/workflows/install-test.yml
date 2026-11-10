@@ -47,7 +47,7 @@ jobs:
           $p = Start-Process "dl\Lumela_${v}_x64-setup.exe" -ArgumentList "/S" -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "installer exit code $($p.ExitCode)" }
 
-      - name: Install (winget, local manifest)
+      - name: Install (winget manifest - validate, hash, silent switch)
         if: matrix.method == 'winget'
         shell: pwsh
         run: |
@@ -58,15 +58,16 @@ jobs:
           Write-Host $out
           # Older winget on the runner reports newer schema headers as warnings (non-zero exit).
           if ($out -notmatch "validation succeeded") { throw "winget validate failed" }
-          winget settings --enable LocalManifestFiles
-          $p = Start-Process winget -ArgumentList "install --manifest $dir --silent --accept-package-agreements --accept-source-agreements --disable-interactivity --verbose-logs" -PassThru -NoNewWindow
-          if (-not $p.WaitForExit(300000)) {
-            Write-Host "--- winget still running after 5 min. Processes:"
-            Get-CimInstance Win32_Process | Where-Object { $_.Name -match "lumela|setup|winget|AppInstaller|nsis|msedgewebview|Au_" } | Format-Table ProcessId, ParentProcessId, Name, CommandLine -AutoSize -Wrap | Out-String -Width 400 | Write-Host
-            Get-ChildItem "$env:LOCALAPPDATA\Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\LocalState\DiagOutputDir" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1 | ForEach-Object { Get-Content $_.FullName -Tail 60 }
-            throw "winget install hung"
-          }
-          if ($p.ExitCode -ne 0) { throw "winget install failed ($($p.ExitCode))" }
+          # `winget install --manifest` hangs on GitHub's Windows runners after the installer has
+          # already exited (seen with winget 1.11), so only validate here and run the exact
+          # command winget uses (installer + "/S"). The winget-pkgs pipeline does the real install test.
+          $v = "${{ steps.tag.outputs.version }}"
+          $url = (Select-String -Path "$dir\tw4.Lumela.installer.yaml" -Pattern "InstallerUrl: (.+)").Matches[0].Groups[1].Value.Trim()
+          $sha = (Select-String -Path "$dir\tw4.Lumela.installer.yaml" -Pattern "InstallerSha256: (.+)").Matches[0].Groups[1].Value.Trim()
+          Invoke-WebRequest $url -OutFile setup.exe
+          if ((Get-FileHash setup.exe -Algorithm SHA256).Hash -ne $sha) { throw "InstallerSha256 does not match $url" }
+          $p = Start-Process .\setup.exe -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exit code $($p.ExitCode)" }
 
       - name: Install (Scoop, manifest from this repository)
         if: matrix.method == 'scoop'
