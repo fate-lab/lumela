@@ -21,6 +21,7 @@ env:
 
 jobs:
   windows:
+    timeout-minutes: 20
     if: inputs.only == '' || inputs.only == 'windows'
     runs-on: windows-latest
     strategy:
@@ -58,8 +59,14 @@ jobs:
           # Older winget on the runner reports newer schema headers as warnings (non-zero exit).
           if ($out -notmatch "validation succeeded") { throw "winget validate failed" }
           winget settings --enable LocalManifestFiles
-          winget install --manifest $dir --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
-          if ($LASTEXITCODE -ne 0) { throw "winget install failed ($LASTEXITCODE)" }
+          $p = Start-Process winget -ArgumentList "install --manifest $dir --silent --accept-package-agreements --accept-source-agreements --disable-interactivity --verbose-logs" -PassThru -NoNewWindow
+          if (-not $p.WaitForExit(300000)) {
+            Write-Host "--- winget still running after 5 min. Processes:"
+            Get-CimInstance Win32_Process | Where-Object { $_.Name -match "lumela|setup|winget|AppInstaller|nsis|msedgewebview|Au_" } | Format-Table ProcessId, ParentProcessId, Name, CommandLine -AutoSize -Wrap | Out-String -Width 400 | Write-Host
+            Get-ChildItem "$env:LOCALAPPDATA\Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\LocalState\DiagOutputDir" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1 | ForEach-Object { Get-Content $_.FullName -Tail 60 }
+            throw "winget install hung"
+          }
+          if ($p.ExitCode -ne 0) { throw "winget install failed ($($p.ExitCode))" }
 
       - name: Install (Scoop, manifest from this repository)
         if: matrix.method == 'scoop'
@@ -179,7 +186,8 @@ jobs:
         if: matrix.method == 'appimage'
         run: |
           v="${{ steps.tag.outputs.version }}"
-          sudo apt-get install -y libfuse2t64
+          # Desktop systems always have these; a bare runner does not.
+          sudo apt-get install -y libfuse2t64 libegl1 libgl1 libgles2
           gh release download "${{ steps.tag.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --pattern "Lumela_${v}_amd64.AppImage" --dir dl
           chmod +x "dl/Lumela_${v}_amd64.AppImage"
           echo "BIN=$PWD/dl/Lumela_${v}_amd64.AppImage" >> "$GITHUB_ENV"
@@ -190,7 +198,7 @@ jobs:
           dbus-launch --exit-with-session "$BIN" > app.log 2>&1 &
           sleep 15
           mkdir -p shots && import -window root "shots/linux-${{ matrix.method }}.png" || true
-          if ! pgrep -f "$(basename "$BIN")" >/dev/null && ! pgrep -x lumela >/dev/null; then
+          if ! pgrep -x lumela >/dev/null || grep -q "error while loading" app.log; then
             echo "Lumela is not running 15 s after launch"; cat app.log; exit 1
           fi
           tail -20 app.log || true
