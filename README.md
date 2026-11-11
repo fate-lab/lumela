@@ -6,7 +6,8 @@
 
 <p align="center">
   <b>Beautiful screenshots in seconds.</b><br>
-  Capture, auto-beautify, annotate, redact and share. Free and open source for Windows, macOS and Linux.
+  Capture, auto-beautify, annotate and share. Emails, card numbers, IPs and API keys are blurred automatically.<br>
+  Free and open source for Windows, macOS and Linux.
 </p>
 
 <p align="center">
@@ -38,6 +39,8 @@ A raw screenshot rarely looks good enough to share. Lumela turns it into a polis
 - **Private by design.** Capture, text recognition and redaction run on your device. Nothing is uploaded.
 - **Fast.** Native capture and a small installer (~10 MB).
 
+If Lumela saves you some manual blurring, a ⭐ on GitHub helps other people find it.
+
 ## Download
 
 Get the installer for your system from the [latest release](https://github.com/tw4/lumela/releases/latest):
@@ -53,8 +56,9 @@ Or install it with a package manager:
 ```bash
 brew trust tw4/tap && brew install --cask tw4/tap/lumela                             # macOS (Homebrew)
 scoop install https://raw.githubusercontent.com/tw4/lumela/main/packaging/scoop/lumela.json   # Windows (Scoop)
-winget install tw4.Lumela                                                            # Windows (winget)
 ```
+
+winget (`tw4.Lumela`) is under review in [microsoft/winget-pkgs#476618](https://github.com/microsoft/winget-pkgs/pull/476618).
 
 Lumela updates itself, and every update is signature-checked before it is installed.
 
