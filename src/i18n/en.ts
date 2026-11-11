@@ -68,6 +68,7 @@ export const en = {
     updateReady: (v: string) => `New version ready: ${v}`,
     updateInstall: "Update and restart",
     updateDownloading: "Downloading update…",
+    updateDownload: "Download",
   },
   panel: {
     presets: "Presets",

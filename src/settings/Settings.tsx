@@ -160,7 +160,7 @@ function Updates() {
         {state === "none" && <span className="dim">{t.settings.upToDate}</span>}
         {state === "error" && <span className="error" title={info}>{t.settings.checkFailed}</span>}
         {state === "available" && update && (
-          <button className="primary" onClick={() => { setState("installing"); installUpdate(update).catch((e) => { setInfo(String(e)); setState("error"); }); }}>
+          <button className="primary" onClick={() => { setState("installing"); installUpdate(update).then(() => setState("available"), (e) => { setInfo(String(e)); setState("error"); }); }}>
             {t.settings.install(info)}
           </button>
         )}

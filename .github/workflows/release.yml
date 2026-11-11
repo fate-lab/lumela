@@ -1,8 +1,9 @@
 name: Release
 
 # Push a tag like v0.2.0. Every platform is built, signed and audited first; only if
-# all of them pass are the installers, updater signatures and latest.json published
-# as a DRAFT release of this repository (review it, then press Publish).
+# all of them pass are the installers, updater signatures and latest.json published as
+# a release of this repository. Installed apps pick it up through latest.json, and the
+# Packages workflow then updates Homebrew, Scoop and winget.
 on:
   push:
     tags: ["v*"]
@@ -72,6 +73,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -83,7 +85,7 @@ jobs:
         run: node scripts/latest-json.mjs artifacts "${GITHUB_REF_NAME}" out
       - name: Audit exactly what is published
         run: node scripts/audit-release.mjs out
-      - name: Create draft release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Hand-written notes in .github/release-notes/<tag>.md win; otherwise GitHub generates them.
@@ -91,5 +93,11 @@ jobs:
           notes=".github/release-notes/${GITHUB_REF_NAME}.md"
           if [ -f "$notes" ]; then set -- --notes-file "$notes"; else set -- --generate-notes; fi
           gh release create "${GITHUB_REF_NAME}" out/* \
-            --repo "${GITHUB_REPOSITORY}" --draft "$@" \
+            --repo "${GITHUB_REPOSITORY}" --latest "$@" \
             --title "Lumela ${GITHUB_REF_NAME}"
+      # A release created with GITHUB_TOKEN does not fire `release: published`, so start
+      # the package updates explicitly (workflow_dispatch is allowed from GITHUB_TOKEN).
+      - name: Update Homebrew, Scoop and winget
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run packages.yml --repo "${GITHUB_REPOSITORY}" --ref main -f tag="${GITHUB_REF_NAME}"

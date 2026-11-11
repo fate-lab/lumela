@@ -28,6 +28,7 @@ export type PermissionStatus = "granted" | "denied" | "unsupported";
 export const screenPermission = () => invoke<PermissionStatus>("screen_permission");
 export const openPermissionSettings = () => invoke<void>("open_permission_settings");
 export const restartApp = () => invoke<void>("restart_app");
+export const selfUpdateSupported = () => invoke<boolean>("self_update_supported");
 
 export const startCapture = (mode: CaptureMode) => invoke<void>("start_capture", { mode });
 export const overlayInfo = () => invoke<OverlayInfo>("overlay_info");

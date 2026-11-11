@@ -392,6 +392,17 @@ fn restart_app(app: AppHandle) {
     app.restart();
 }
 
+/// Whether the built-in updater can replace this install. On Linux it can only swap an
+/// AppImage (which sets `APPIMAGE`); `.deb`/`.rpm` installs are updated by reinstalling.
+fn self_update_supported_for(os: &str, appimage: Option<&str>) -> bool {
+    os != "linux" || appimage.is_some_and(|p| !p.is_empty())
+}
+
+#[tauri::command]
+fn self_update_supported() -> bool {
+    self_update_supported_for(std::env::consts::OS, std::env::var("APPIMAGE").ok().as_deref())
+}
+
 #[tauri::command]
 fn copy_text(text: String) -> Result<(), String> {
     arboard::Clipboard::new().and_then(|mut c| c.set_text(text)).map_err(|e| e.to_string())
@@ -738,6 +749,7 @@ pub fn run() {
             screen_permission,
             open_permission_settings,
             restart_app,
+            self_update_supported,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -752,5 +764,14 @@ mod tests {
         assert_eq!(urlencoding_decode("C%3A%5CUsers%5C%C3%BCmit%20a.png"), "C:\\Users\\ümit a.png");
         assert_eq!(urlencoding_decode("plain"), "plain");
         assert_eq!(urlencoding_decode("bad%zz%4"), "bad%zz%4");
+    }
+
+    #[test]
+    fn only_appimage_self_updates_on_linux() {
+        assert!(self_update_supported_for("windows", None));
+        assert!(self_update_supported_for("macos", None));
+        assert!(self_update_supported_for("linux", Some("/home/u/Lumela.AppImage")));
+        assert!(!self_update_supported_for("linux", None));
+        assert!(!self_update_supported_for("linux", Some("")));
     }
 }

@@ -25,7 +25,7 @@ interface SavedState { beautify?: import("../lib/beautify").BeautifySettings; an
 import { BackgroundImage, render, Source, Watermark } from "../lib/render";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { tempDir, join } from "@tauri-apps/api/path";
-import { checkForUpdate, installUpdate } from "../lib/updates";
+import { canSelfUpdate, checkForUpdate, installUpdate, oncePerVersion, UPDATE_CHECK_INTERVAL_MS } from "../lib/updates";
 import { useStore } from "../lib/store";
 import AnnotationLayer, { Tool } from "./AnnotationLayer";
 import Panel from "./Panel";
@@ -112,16 +112,30 @@ export default function Editor() {
   const [showHistory, setShowHistory] = useState(false);
   const [showPermission, setShowPermission] = useState(false);
 
-  // Look for an update once per launch (silently when there is none or offline).
+  // Look for an update at launch and every few hours after (the app lives in the tray),
+  // silently when there is none or offline, and tell about each version only once.
   useEffect(() => {
     if (import.meta.env.DEV) return;
-    checkForUpdate().then((s) => {
-      if (s.kind !== "available") return;
+    const isNew = oncePerVersion();
+    const look = async () => {
+      const s = await checkForUpdate();
+      if (s.kind !== "available" || !isNew(s.update.version)) return;
+      const self = await canSelfUpdate();
+      const t = getT().toast;
       setToast({
-        text: getT().toast.updateReady(s.update.version),
-        action: { label: getT().toast.updateInstall, run: () => { setToast({ text: getT().toast.updateDownloading }); installUpdate(s.update).catch((e) => notify(String(e), true)); } },
+        text: t.updateReady(s.update.version),
+        action: {
+          label: self ? t.updateInstall : t.updateDownload,
+          run: () => {
+            if (self) setToast({ text: t.updateDownloading });
+            installUpdate(s.update).catch((e) => notify(String(e), true));
+          },
+        },
       });
-    });
+    };
+    look();
+    const timer = window.setInterval(look, UPDATE_CHECK_INTERVAL_MS);
+    return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {

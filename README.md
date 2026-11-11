@@ -65,7 +65,7 @@ scoop install https://raw.githubusercontent.com/tw4/lumela/main/packaging/scoop/
 
 winget (`tw4.Lumela`) is under review in [microsoft/winget-pkgs#476618](https://github.com/microsoft/winget-pkgs/pull/476618).
 
-Lumela updates itself, and every update is signature-checked before it is installed.
+Lumela checks for new versions in the background and offers a one-click update: it downloads, checks the signature, installs and restarts, so there is nothing to uninstall or download again. On Linux this works with the AppImage; with the `.deb` the update button opens the release page.
 
 > [!NOTE]
 > Installers are not code-signed yet, so the operating system warns on first launch.

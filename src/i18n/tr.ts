@@ -69,6 +69,7 @@ export const tr: Dict = {
     updateReady: (v) => `Yeni sürüm hazır: ${v}`,
     updateInstall: "Güncelle ve yeniden başlat",
     updateDownloading: "Güncelleme indiriliyor…",
+    updateDownload: "İndir",
   },
   panel: {
     presets: "Hazır ayarlar",
