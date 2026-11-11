@@ -165,6 +165,8 @@ export const en = {
     ocrSystem: "System languages",
     autoRedact: "Auto redaction",
     categories: { emails: "Email addresses", creditCards: "Credit card numbers", ipAddresses: "IP addresses", apiKeys: "API keys and tokens" },
+    customWords: "Custom words",
+    customWordsHint: "One word or phrase per line, such as a company or customer name, a project code or a hostname. Case does not matter, and acme also covers acme-prod-db.",
     redactOnLoad: "Redact automatically when an image opens",
     ocrPrivacy: "Text recognition runs on your device; images are never uploaded.",
   },

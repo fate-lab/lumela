@@ -20,7 +20,7 @@ operating system, and a React + TypeScript web UI does editing and rendering.
 │                  windows → Windows.Media.Ocr                           │
 │                  macos   → Vision (VNRecognizeTextRequest)             │
 │                  linux   → tesseract CLI (TSV parser)                  │
-│ redact.rs      emails, Luhn-checked cards, IPv4/IPv6, API keys         │
+│ redact.rs      emails, Luhn cards, IPv4/IPv6, API keys, custom words   │
 │ export.rs      clipboard, file naming, lossless PNG optimisation       │
 │ history.rs     captures + editor state under the app data dir          │
 │ settings.rs    app-level settings; permissions.rs (macOS recording)    │

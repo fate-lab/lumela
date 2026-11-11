@@ -170,7 +170,7 @@ function Updates() {
   );
 }
 
-const CATEGORIES: (keyof RedactCategories)[] = ["emails", "creditCards", "ipAddresses", "apiKeys"];
+const CATEGORIES: Exclude<keyof RedactCategories, "customWords">[] = ["emails", "creditCards", "ipAddresses", "apiKeys"];
 
 function Ocr() {
   const t = useT();
@@ -190,6 +190,16 @@ function Ocr() {
       {CATEGORIES.map((k) => (
         <Toggle key={k} label={t.settings.categories[k]} checked={prefs.autoRedact[k]} onChange={(v) => setPrefs({ autoRedact: { ...prefs.autoRedact, [k]: v } })} />
       ))}
+      <label className="field">
+        <span>{t.settings.customWords}</span>
+        <textarea
+          rows={4}
+          spellCheck={false}
+          value={prefs.autoRedact.customWords.join("\n")}
+          onChange={(e) => setPrefs({ autoRedact: { ...prefs.autoRedact, customWords: e.target.value.split("\n") } })}
+        />
+      </label>
+      <p className="dim">{t.settings.customWordsHint}</p>
       <Toggle
         label={t.settings.redactOnLoad} checked={prefs.autoRedactOnLoad}
         onChange={(autoRedactOnLoad) => setPrefs({ autoRedactOnLoad })}

@@ -76,11 +76,21 @@ export function installBrowserMock() {
       case "get_shortcuts": return { area: "ctrl+shift+Digit2", window: "ctrl+shift+Digit3", fullscreen: "ctrl+shift+Digit1" };
       case "ocr_current": return fakeOcr();
       case "ocr_languages": return [{ tag: "en-US", name: "English (United States)" }];
-      case "detect_sensitive": return fakeOcr().lines.slice(0, 4).map((l, i) => {
-        const w = l.words[l.words.length - 1];
-        const first = i === 1 ? l.words[1] : w;
-        return { category: ["email", "credit-card", "ip-address", "api-key"][i], x: first.x, y: w.y, w: w.x + w.w - first.x, h: w.h };
-      });
+      case "detect_sensitive": {
+        const ocr = fakeOcr();
+        const hits = ocr.lines.slice(0, 4).map((l, i) => {
+          const w = l.words[l.words.length - 1];
+          const first = i === 1 ? l.words[1] : w;
+          return { category: ["email", "credit-card", "ip-address", "api-key"][i], x: first.x, y: w.y, w: w.x + w.w - first.x, h: w.h };
+        });
+        // Single custom words only, compared whole; the real matching is in redact.rs.
+        const custom = new Set(((args as { categories?: { customWords?: string[] } }).categories?.customWords ?? [])
+          .map((word) => word.trim().toLowerCase()).filter(Boolean));
+        for (const w of ocr.lines.flatMap((l) => l.words)) {
+          if (custom.has(w.text.replace(/[^\p{L}\p{N}]/gu, "").toLowerCase())) hits.push({ category: "custom-word", x: w.x, y: w.y, w: w.w, h: w.h });
+        }
+        return hits;
+      }
       case "copy_rgba": case "save_bytes": case "set_shortcuts": case "suspend_shortcuts": case "copy_text":
         console.info("[mock]", cmd, args);
         return cmd === "save_bytes" ? "C:\\mock\\saved.png" : null;

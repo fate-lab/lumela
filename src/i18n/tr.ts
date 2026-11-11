@@ -166,6 +166,8 @@ export const tr: Dict = {
     ocrSystem: "Sistem dilleri",
     autoRedact: "Otomatik karartma",
     categories: { emails: "E-posta adresleri", creditCards: "Kredi kartı numaraları", ipAddresses: "IP adresleri", apiKeys: "API anahtarları ve token'lar" },
+    customWords: "Custom words",
+    customWordsHint: "One word or phrase per line, such as a company or customer name, a project code or a hostname. Case does not matter, and acme also covers acme-prod-db.",
     redactOnLoad: "Görüntü açılınca otomatik karart",
     ocrPrivacy: "Metin tanıma cihaz üzerinde çalışır, görüntüler hiçbir yere gönderilmez.",
   },

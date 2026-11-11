@@ -32,7 +32,7 @@ export const DEFAULT_PREFS: AppPrefs = {
   closeAfterCopy: false,
   format: "png",
   ocrLanguage: "",
-  autoRedact: { emails: true, creditCards: true, ipAddresses: true, apiKeys: true },
+  autoRedact: { emails: true, creditCards: true, ipAddresses: true, apiKeys: true, customWords: [] },
   autoRedactOnLoad: false,
   sounds: true,
   compressPng: true,

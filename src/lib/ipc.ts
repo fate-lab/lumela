@@ -50,8 +50,12 @@ export interface OcrWord { text: string; x: number; y: number; w: number; h: num
 export interface OcrLine { text: string; words: OcrWord[] }
 export interface OcrResult { lines: OcrLine[] }
 export interface OcrLanguage { tag: string; name: string }
-export interface RedactCategories { emails: boolean; creditCards: boolean; ipAddresses: boolean; apiKeys: boolean }
-export interface SensitiveHit { category: "email" | "credit-card" | "ip-address" | "api-key"; x: number; y: number; w: number; h: number }
+export interface RedactCategories {
+  emails: boolean; creditCards: boolean; ipAddresses: boolean; apiKeys: boolean;
+  /** Words and phrases to cover, one per entry, as typed (blank entries are ignored). */
+  customWords: string[];
+}
+export interface SensitiveHit { category: "email" | "credit-card" | "ip-address" | "api-key" | "custom-word"; x: number; y: number; w: number; h: number }
 
 export const ocrCurrent = (language: string) => invoke<OcrResult>("ocr_current", { language });
 export const ocrLanguages = () => invoke<OcrLanguage[]>("ocr_languages");

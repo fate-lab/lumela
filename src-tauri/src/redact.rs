@@ -1,5 +1,5 @@
-//! Finds sensitive text (emails, card numbers, IP addresses, API keys) in OCR output
-//! and returns the boxes to cover.
+//! Finds sensitive text (emails, card numbers, IP addresses, API keys, and the person's own
+//! words such as company or customer names) in OCR output and returns the boxes to cover.
 
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::LazyLock;
@@ -16,20 +16,25 @@ pub enum Category {
     CreditCard,
     IpAddress,
     ApiKey,
+    CustomWord,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Categories {
     pub emails: bool,
     pub credit_cards: bool,
     pub ip_addresses: bool,
     pub api_keys: bool,
+    /// Words and phrases to cover wherever they appear, one entry each ("Acme Corp"). Empty
+    /// entries are ignored. Missing in settings saved before the list existed.
+    #[serde(default)]
+    pub custom_words: Vec<String>,
 }
 
 impl Default for Categories {
     fn default() -> Self {
-        Self { emails: true, credit_cards: true, ip_addresses: true, api_keys: true }
+        Self { emails: true, credit_cards: true, ip_addresses: true, api_keys: true, custom_words: Vec::new() }
     }
 }
 
@@ -196,7 +201,58 @@ fn wraps_onto(a: &Word, b: &Word) -> bool {
     b.y > a.y && gap >= -a.h * 0.2 && gap <= a.h && b.x < a.x
 }
 
+/// A custom word list entry, lowercased and split into words: "Acme Corp" is `["acme", "corp"]`.
+fn custom_entries(words: &[String]) -> Vec<Vec<String>> {
+    words
+        .iter()
+        .map(|entry| entry.split_whitespace().map(str::to_lowercase).collect::<Vec<_>>())
+        .filter(|entry| !entry.is_empty())
+        .collect()
+}
+
+/// An OCR word without surrounding punctuation, lowercased.
+fn bare(text: &str) -> String {
+    text.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase()
+}
+
+/// True when the OCR word is `entry`, or one of the pieces it splits into on `-` `_` `.` `/` `@` `:`
+/// is: "acme" matches "acme-prod-db" and "db.acme.local", but not "pacme" or "acmesoft".
+fn word_matches(text: &str, entry: &str) -> bool {
+    bare(text) == entry || text.split(['-', '_', '.', '/', '@', ':']).any(|piece| bare(piece) == entry)
+}
+
+/// The custom word hits on one line, skipping words another category already covers. A
+/// multi-word entry is the same words next to each other on the line, compared whole.
+fn custom_word_hits(words: &[Word], entries: &[Vec<String>], used: &mut [bool]) -> Vec<Hit> {
+    let mut out = Vec::new();
+    // Longer phrases first, so "Acme Corp" is one box rather than "Acme" and "Corp" apart.
+    let mut entries: Vec<&Vec<String>> = entries.iter().collect();
+    entries.sort_by_key(|entry| std::cmp::Reverse(entry.len()));
+    for entry in entries {
+        if entry.len() > words.len() {
+            continue;
+        }
+        for k in 0..=words.len() - entry.len() {
+            let span = k..k + entry.len();
+            if used[span.clone()].iter().any(|&u| u) {
+                continue;
+            }
+            let found = if entry.len() == 1 {
+                word_matches(&words[k].text, &entry[0])
+            } else {
+                words[span.clone()].iter().zip(entry).all(|(w, e)| bare(&w.text) == *e)
+            };
+            if found {
+                used[span.clone()].fill(true);
+                out.push(hit(Category::CustomWord, &words[span].iter().collect::<Vec<_>>()));
+            }
+        }
+    }
+    out
+}
+
 pub fn detect(ocr: &OcrResult, cats: Categories) -> Vec<Hit> {
+    let custom = custom_entries(&cats.custom_words);
     let mut hits = Vec::new();
     // Per line, which words are covered by an API key hit (used to follow wrapped keys).
     let mut key_words: Vec<Vec<bool>> = Vec::with_capacity(ocr.lines.len());
@@ -235,6 +291,9 @@ pub fn detect(ocr: &OcrResult, cats: Categories) -> Vec<Hit> {
                 }
                 hits.push(hit(c, &idx.iter().map(|&j| &line.words[j]).collect::<Vec<_>>()));
             }
+        }
+        if !custom.is_empty() {
+            hits.extend(custom_word_hits(&line.words, &custom, &mut used));
         }
         key_words.push(keys);
     }
@@ -424,5 +483,72 @@ mod tests {
         let cats = Categories { emails: false, ..Default::default() };
         let r = detect(&OcrResult { lines: vec![line(&["a@b.com"])] }, cats);
         assert!(r.is_empty());
+    }
+
+    fn custom(words: &[&str]) -> Categories {
+        Categories { custom_words: words.iter().map(|w| w.to_string()).collect(), ..Default::default() }
+    }
+
+    /// The texts of the words under custom word boxes.
+    fn custom_found(l: &Line, words: &[&str]) -> Vec<String> {
+        let hits = detect(&OcrResult { lines: vec![l.clone()] }, custom(words));
+        hits.iter()
+            .filter(|h| h.category == Category::CustomWord)
+            .map(|h| l.words.iter().filter(|w| covers(h, w)).map(|w| w.text.as_str()).collect::<Vec<_>>().join(" "))
+            .collect()
+    }
+
+    #[test]
+    fn custom_word_is_found_whole_and_case_insensitive() {
+        let l = line(&["Invoice", "for", "ACME,", "sent", "to", "acme"]);
+        assert_eq!(custom_found(&l, &["Acme"]), vec!["ACME,", "acme"]);
+    }
+
+    #[test]
+    fn custom_word_matches_a_piece_between_separators() {
+        let l = line(&["acme-prod-db", "db.acme.local", "ops@acme", "acme_staging", "acme:443"]);
+        assert_eq!(
+            custom_found(&l, &["acme"]),
+            vec!["acme-prod-db", "db.acme.local", "ops@acme", "acme_staging", "acme:443"]
+        );
+    }
+
+    #[test]
+    fn custom_word_does_not_match_inside_another_word() {
+        assert!(custom_found(&line(&["pacme", "acmesoft", "acmeprod-db"]), &["acme"]).is_empty());
+    }
+
+    #[test]
+    fn multi_word_entry_is_one_box_over_adjacent_words() {
+        let l = line(&["Signed", "by", "Acme", "corp.", "today", "and", "Acme", "alone"]);
+        let hits = detect(&OcrResult { lines: vec![l.clone()] }, custom(&["Acme Corp"]));
+        assert_eq!(hits.len(), 1, "{hits:?}");
+        assert!(covers(&hits[0], &l.words[2]) && covers(&hits[0], &l.words[3]));
+        assert!(!covers(&hits[0], &l.words[6]));
+    }
+
+    #[test]
+    fn longer_entries_win_and_words_are_covered_once() {
+        let l = line(&["Acme", "Corp", "and", "Acme"]);
+        assert_eq!(custom_found(&l, &["Acme", "Acme Corp"]), vec!["Acme Corp", "Acme"]);
+    }
+
+    #[test]
+    fn empty_and_blank_entries_are_ignored() {
+        assert!(custom_found(&line(&["anything", "here"]), &["", "   "]).is_empty());
+    }
+
+    #[test]
+    fn a_word_another_category_found_is_not_counted_twice() {
+        let hits = detect(&OcrResult { lines: vec![line(&["jane@acme.com"])] }, custom(&["acme"]));
+        assert_eq!(hits.iter().map(|h| h.category).collect::<Vec<_>>(), vec![Category::Email]);
+    }
+
+    #[test]
+    fn settings_saved_before_the_list_still_load() {
+        let cats: Categories =
+            serde_json::from_str(r#"{"emails":true,"creditCards":false,"ipAddresses":true,"apiKeys":true}"#).unwrap();
+        assert!(cats.custom_words.is_empty());
+        assert!(!cats.credit_cards);
     }
 }
