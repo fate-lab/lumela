@@ -370,8 +370,10 @@ fn open_settings_window(app: &AppHandle, tab: Option<&str>) -> Result<(), String
         .map_err(|e| e.to_string())
 }
 
+/// Async on purpose: synchronous commands run on the main thread, and building a
+/// webview window there deadlocks on Windows (white window, frozen app).
 #[tauri::command]
-fn open_settings(app: AppHandle, tab: Option<String>) -> Result<(), String> {
+async fn open_settings(app: AppHandle, tab: Option<String>) -> Result<(), String> {
     open_settings_window(&app, tab.as_deref())
 }
 
