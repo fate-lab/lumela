@@ -1,12 +1,12 @@
 {
-    "version": "0.1.3",
+    "version": "0.1.4",
     "description": "Screenshot tool: capture, beautify, annotate, redact and copy text",
     "homepage": "https://github.com/tw4/lumela",
     "license": "GPL-3.0-or-later",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/tw4/lumela/releases/download/v0.1.3/Lumela_0.1.3_x64-setup.exe",
-            "hash": "b11a81aecde889f75df06a6bcddd8d809b4dea7cb70e5a9345c5623490ccd534"
+            "url": "https://github.com/tw4/lumela/releases/download/v0.1.4/Lumela_0.1.4_x64-setup.exe",
+            "hash": "b086195bac407d28285fe2fd761681267081a145b43ef82d755755076154d94a"
         }
     },
     "installer": {
