@@ -163,9 +163,45 @@ fn card_hits(words: &[Word]) -> Vec<Hit> {
     out
 }
 
+fn tokenish(text: &str) -> bool {
+    !text.is_empty() && text.chars().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '+' | '/' | '='))
+}
+
+/// A piece of a key rather than a word: it has a digit, or capitals after the first letter.
+fn looks_random(text: &str) -> bool {
+    text.chars().any(|c| c.is_ascii_digit())
+        || (text.chars().skip(1).any(|c| c.is_ascii_uppercase()) && text.chars().any(|c| c.is_ascii_lowercase()))
+}
+
+/// Indices of `words[k]` and the token-like pieces right after it on the same line.
+/// OCR often splits a long key into pieces ("…vXz1 aBc").
+fn with_adjacent_pieces(words: &[Word], k: usize) -> Vec<usize> {
+    let mut out = vec![k];
+    let mut last = &words[k];
+    for (j, next) in words.iter().enumerate().skip(k + 1) {
+        let gap = next.x - (last.x + last.w);
+        if gap > last.h * 0.8 || !tokenish(&next.text) {
+            break;
+        }
+        out.push(j);
+        last = next;
+    }
+    out
+}
+
+/// True when `b`, the first word of a line, sits right under the line that ends with `a`
+/// and starts further left: what a key looks like when it wraps.
+fn wraps_onto(a: &Word, b: &Word) -> bool {
+    let gap = b.y - (a.y + a.h);
+    b.y > a.y && gap >= -a.h * 0.2 && gap <= a.h && b.x < a.x
+}
+
 pub fn detect(ocr: &OcrResult, cats: Categories) -> Vec<Hit> {
     let mut hits = Vec::new();
+    // Per line, which words are covered by an API key hit (used to follow wrapped keys).
+    let mut key_words: Vec<Vec<bool>> = Vec::with_capacity(ocr.lines.len());
     for line in &ocr.lines {
+        let mut keys = vec![false; line.words.len()];
         let mut used = vec![false; line.words.len()];
         if cats.credit_cards {
             for h in card_hits(&line.words) {
@@ -192,24 +228,40 @@ pub fn detect(ocr: &OcrResult, cats: Categories) -> Vec<Hit> {
                 None
             };
             if let Some(c) = category {
-                let mut covered = vec![w];
-                // OCR often splits a long key into pieces ("…vXz1 aBc"); take adjacent
-                // token-like pieces with it so nothing is left uncovered.
-                if c == Category::ApiKey {
-                    let mut last = w;
-                    for (j, next) in line.words.iter().enumerate().skip(k + 1) {
-                        let gap = next.x - (last.x + last.w);
-                        let tokenish = next.text.chars().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '+' | '/' | '='));
-                        if gap > last.h * 0.8 || !tokenish {
-                            break;
-                        }
-                        used[j] = true;
-                        covered.push(next);
-                        last = next;
-                    }
+                let idx = if c == Category::ApiKey { with_adjacent_pieces(&line.words, k) } else { vec![k] };
+                for &j in &idx {
+                    used[j] = true;
+                    keys[j] = c == Category::ApiKey;
                 }
-                hits.push(hit(c, &covered));
+                hits.push(hit(c, &idx.iter().map(|&j| &line.words[j]).collect::<Vec<_>>()));
             }
+        }
+        key_words.push(keys);
+    }
+
+    // A key that does not fit on one line continues at the start of the next one.
+    if cats.api_keys {
+        for i in 0..ocr.lines.len().saturating_sub(1) {
+            let (la, lb) = (&ocr.lines[i].words, &ocr.lines[i + 1].words);
+            let (Some(a), Some(b)) = (la.last(), lb.first()) else { continue };
+            let ai = la.len() - 1;
+            let tail = token(&a.text);
+            if key_words[i + 1][0] || !wraps_onto(a, b) || !tokenish(tail) || !tokenish(&b.text) || !looks_random(&b.text) {
+                continue;
+            }
+            let a_is_key = key_words[i][ai];
+            if !a_is_key && !is_api_key(&format!("{tail}{}", b.text)) {
+                continue;
+            }
+            if !a_is_key {
+                key_words[i][ai] = true;
+                hits.push(hit(Category::ApiKey, &[a]));
+            }
+            let idx = with_adjacent_pieces(lb, 0);
+            for &j in &idx {
+                key_words[i + 1][j] = true;
+            }
+            hits.push(hit(Category::ApiKey, &idx.iter().map(|&j| &lb[j]).collect::<Vec<_>>()));
         }
     }
     hits
@@ -274,6 +326,48 @@ mod tests {
         assert_eq!(hits[0].x + hits[0].w, l.words[2].x + l.words[2].w);
     }
 
+    /// A second line starting at the left margin, just below `first`.
+    fn next_line(first: &Line, words: &[&str]) -> Line {
+        let mut l = line(words);
+        for w in &mut l.words {
+            w.y = first.words[0].y + first.words[0].h + 6.0;
+        }
+        l
+    }
+
+    fn covers(h: &Hit, w: &Word) -> bool {
+        w.x >= h.x - 0.5 && w.x + w.w <= h.x + h.w + 0.5 && w.y >= h.y - 0.5 && w.y + w.h <= h.y + h.h + 0.5
+    }
+
+    #[test]
+    fn wrapped_key_tail_on_next_line_is_covered() {
+        // The first part is a key on its own; the short tail wraps to the next line.
+        let a = line(&["API", "key:", "sk-live-9fJ2kLm8QpRt"]);
+        let b = next_line(&a, &["5vXz1aBcQ7", "is", "active"]);
+        let hits = detect(&OcrResult { lines: vec![a.clone(), b.clone()] }, Categories::default());
+        assert!(hits.iter().any(|h| h.category == Category::ApiKey && covers(h, &a.words[2])), "{hits:?}");
+        assert!(hits.iter().any(|h| h.category == Category::ApiKey && covers(h, &b.words[0])), "{hits:?}");
+    }
+
+    #[test]
+    fn key_split_into_two_short_halves_across_lines_is_covered() {
+        // Neither half is long enough to look like a key alone; together they are.
+        let a = line(&["token:", "a8F3kQ9zLm2Xv7Tq"]);
+        let b = next_line(&a, &["B7nP0wRt5YcE4uHs"]);
+        let hits = detect(&OcrResult { lines: vec![a.clone(), b.clone()] }, Categories::default());
+        assert!(hits.iter().any(|h| covers(h, &a.words[1])), "{hits:?}");
+        assert!(hits.iter().any(|h| covers(h, &b.words[0])), "{hits:?}");
+    }
+
+    #[test]
+    fn ordinary_next_line_is_not_swallowed() {
+        let a = line(&["API", "key:", "sk-live-9fJ2kLm8QpRt5vXz1aBc"]);
+        let b = next_line(&a, &["Created", "yesterday"]);
+        let hits = detect(&OcrResult { lines: vec![a.clone(), b.clone()] }, Categories::default());
+        assert_eq!(hits.len(), 1, "{hits:?}");
+        assert!(!hits.iter().any(|h| covers(h, &b.words[0])));
+    }
+
     #[test]
     fn ignores_ordinary_text() {
         assert!(cats_found(&["Version", "1.2.3", "released", "on", "2026-11-10", "build", "12345"]).is_empty());
@@ -299,6 +393,30 @@ mod tests {
             "OCR lines: {:?}",
             ocr.lines.iter().map(|l| &l.text).collect::<Vec<_>>()
         );
+    }
+
+    /// Keys that wrap onto the next line, read by the real platform OCR engine.
+    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn platform_ocr_covers_wrapped_keys_in_fixture() {
+        use crate::ocr::engine;
+        let lang = if cfg!(target_os = "linux") { "eng" } else { "en-US" };
+        let img = image::open(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/wrapped-key.png")).unwrap().to_rgba8();
+        let ocr = engine().recognize(&img, Some(lang)).or_else(|_| engine().recognize(&img, None)).unwrap();
+        let hits = detect(&ocr, Categories::default());
+        let lines: Vec<&String> = ocr.lines.iter().map(|l| &l.text).collect();
+        // Each piece of both keys, on both lines, must be under an API key box.
+        for piece in ["9fJ2", "5vXz", "a8F3", "B7nP"] {
+            let words: Vec<&Word> = ocr.lines.iter().flat_map(|l| &l.words).filter(|w| w.text.contains(piece)).collect();
+            assert!(!words.is_empty(), "OCR did not read {piece}: {lines:?}");
+            for w in words {
+                assert!(
+                    hits.iter().any(|h| h.category == Category::ApiKey && covers(h, w)),
+                    "{piece} ({:?}) is not covered. OCR lines: {lines:?}, hits: {hits:?}",
+                    w.text
+                );
+            }
+        }
     }
 
     #[test]

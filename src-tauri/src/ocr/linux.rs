@@ -2,6 +2,7 @@
 //! (e.g. `apt install tesseract-ocr tesseract-ocr-eng`).
 
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use image::RgbaImage;
 
@@ -9,13 +10,18 @@ use super::{tsv, OcrEngine, OcrLanguage, OcrResult};
 
 pub struct Tesseract;
 
+/// Each call gets its own temp file, so OCR runs that overlap in one process
+/// (e.g. auto redact and text selection) never read each other's image.
+static NEXT_FILE: AtomicU64 = AtomicU64::new(0);
+
 fn not_found(e: std::io::Error) -> String {
     format!("Could not run tesseract ({e}). Install it with: sudo apt install tesseract-ocr")
 }
 
 impl OcrEngine for Tesseract {
     fn recognize(&self, image: &RgbaImage, language: Option<&str>) -> Result<OcrResult, String> {
-        let path = std::env::temp_dir().join(format!("scs-ocr-{}.png", std::process::id()));
+        let n = NEXT_FILE.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!("scs-ocr-{}-{n}.png", std::process::id()));
         image.save(&path).map_err(|e| e.to_string())?;
         let mut cmd = Command::new("tesseract");
         cmd.arg(&path).arg("stdout");
