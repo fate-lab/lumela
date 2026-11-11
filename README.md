@@ -5,9 +5,13 @@
 <h1 align="center">Lumela</h1>
 
 <p align="center">
-  <b>Beautiful screenshots in seconds.</b><br>
+  <b>CleanShot-style screenshots for Windows, macOS and Linux.</b><br>
   Capture, auto-beautify, annotate and share. Emails, card numbers, IPs and API keys are blurred automatically.<br>
-  Free and open source for Windows, macOS and Linux.
+  Free and open source.
+</p>
+
+<p align="center">
+  English · <a href="README.zh-CN.md">简体中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a>
 </p>
 
 <p align="center">
@@ -37,7 +41,8 @@ A raw screenshot rarely looks good enough to share. Lumela turns it into a polis
 
 - **Everything is free.** No accounts, no subscriptions, no watermark.
 - **Private by design.** Capture, text recognition and redaction run on your device. Nothing is uploaded.
-- **Fast.** Native capture and a small installer (~10 MB).
+- **Fast.** Native capture and a small installer (about 4 MB on Windows, 12 MB on macOS).
+- **Same app everywhere.** Windows, macOS and Linux get the same editor, shortcuts and features.
 
 If Lumela saves you some manual blurring, a ⭐ on GitHub helps other people find it.
 
