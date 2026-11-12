@@ -201,13 +201,16 @@ fn wraps_onto(a: &Word, b: &Word) -> bool {
     b.y > a.y && gap >= -a.h * 0.2 && gap <= a.h && b.x < a.x
 }
 
-/// A custom word list entry, lowercased and split into words: "Acme Corp" is `["acme", "corp"]`.
+/// The custom word list as words, cleaned like the OCR words ("Acme Corp." is `["acme", "corp"]`),
+/// longer phrases first, so "Acme Corp" is one box rather than "Acme" and "Corp" apart.
 fn custom_entries(words: &[String]) -> Vec<Vec<String>> {
-    words
+    let mut entries: Vec<Vec<String>> = words
         .iter()
-        .map(|entry| entry.split_whitespace().map(str::to_lowercase).collect::<Vec<_>>())
+        .map(|entry| entry.split_whitespace().map(bare).filter(|w| !w.is_empty()).collect::<Vec<_>>())
         .filter(|entry| !entry.is_empty())
-        .collect()
+        .collect();
+    entries.sort_by_key(|entry| std::cmp::Reverse(entry.len()));
+    entries
 }
 
 /// An OCR word without surrounding punctuation, lowercased.
@@ -225,9 +228,6 @@ fn word_matches(text: &str, entry: &str) -> bool {
 /// multi-word entry is the same words next to each other on the line, compared whole.
 fn custom_word_hits(words: &[Word], entries: &[Vec<String>], used: &mut [bool]) -> Vec<Hit> {
     let mut out = Vec::new();
-    // Longer phrases first, so "Acme Corp" is one box rather than "Acme" and "Corp" apart.
-    let mut entries: Vec<&Vec<String>> = entries.iter().collect();
-    entries.sort_by_key(|entry| std::cmp::Reverse(entry.len()));
     for entry in entries {
         if entry.len() > words.len() {
             continue;
@@ -531,6 +531,13 @@ mod tests {
     fn longer_entries_win_and_words_are_covered_once() {
         let l = line(&["Acme", "Corp", "and", "Acme"]);
         assert_eq!(custom_found(&l, &["Acme", "Acme Corp"]), vec!["Acme Corp", "Acme"]);
+    }
+
+    #[test]
+    fn punctuation_around_an_entry_is_ignored() {
+        let l = line(&["Acme", "Corp", "and", "acme", "kept", "secret."]);
+        assert_eq!(custom_found(&l, &["Acme Corp.", "@acme", "(secret)"]), vec!["Acme Corp", "acme", "secret."]);
+        assert!(custom_found(&l, &["--", "\"\""]).is_empty());
     }
 
     #[test]

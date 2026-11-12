@@ -85,7 +85,7 @@ export function installBrowserMock() {
         });
         // Single custom words only, compared whole; the real matching is in redact.rs.
         const custom = new Set(((args as { categories?: { customWords?: string[] } }).categories?.customWords ?? [])
-          .map((word) => word.trim().toLowerCase()).filter(Boolean));
+          .map((word) => word.replace(/[^\p{L}\p{N}]/gu, "").toLowerCase()).filter(Boolean));
         for (const w of ocr.lines.flatMap((l) => l.words)) {
           if (custom.has(w.text.replace(/[^\p{L}\p{N}]/gu, "").toLowerCase())) hits.push({ category: "custom-word", x: w.x, y: w.y, w: w.w, h: w.h });
         }
